@@ -56,19 +56,21 @@
    1. YGC（Young GC）回收之后，大多数的对象会被回收，活着的进入s0
    2. 再次YGC，活着的对象eden + s0 -> s1
    3. 再次YGC，eden + s1 -> s0
-   4. 年龄足够 -> 老年代 （15 CMS 6）
+   4. 年龄足够 -> 老年代 （古老的GC 15岁 CMS 6岁）
    5. s区装不下 -> 老年代
    6. 新对象new出来应该放入eden，但是如果太大，则直接进入老年代
+老年代就是个兜底的
    
 4. 老年代
-   1. 顽固分子
+   1. 顽固分子 在s0和s1之间已经来回copy了好多次了，太顽固，就别再费事了
    2. 老年代满了FGC Full GC
 
 eden : suvivor0 : suvivor1 = 8 : 1 : 1
 new : old = 1 : 3
+这个比例的底层原因是：确信eden去里面绝大多数的对象会被一次GC回收掉
    
 5. GC Tuning (Generation)
-   1. 尽量减少FGC
+   1. 尽量减少FGC（调优的目标）, 否则会Stop the world。多么低算低要看业务场景。STW在自动回收的技术里是不可避免的
    2. MinorGC = YGC
    3. MajorGC = FGC
    
@@ -88,13 +90,13 @@ new : old = 1 : 3
 
 1. JDK诞生 Serial追随 提高效率，诞生了PS，为了配合CMS，诞生了PN，CMS是1.4版本后期引入，CMS是里程碑式的GC，它开启了并发回收的过程，但是CMS毛病较多，因此目前任何一个JDK版本默认是CMS
    并发垃圾回收是因为无法忍受STW
-2. Serial 年轻代 串行回收
-3. PS 年轻代 并行回收
-4. ParNew 年轻代 配合CMS的并行回收
+2. Serial 年轻代 串行回收 a stop-the-world(停下所有的用户线程，垃圾回收线程上场，回收完了之后，程序继续运行), copying collector which uses a single GC thread
+3. Parellel Scavenge 年轻代 多线程并行回收
+4. ParNew 年轻代 也是并行回收，为了配合CMS的并行回收而设计的
 5. SerialOld 
-6. ParallelOld
-7. ConcurrentMarkSweep 老年代 并发的， 垃圾回收和应用程序同时运行，降低STW的时间(200ms)
-   CMS问题比较多，所以现在没有一个版本默认是CMS，只能手工指定
+6. ParallelOld 所谓的调优绝大多数都是跳的2、3、5、6，因为1.8默认的GC是PS + ParallelOld
+7. ConcurrentMarkSweep 老年代 并发的， 垃圾回收和应用程序同时运行，降低STW的时间(200ms)，其他的GC可能需要几个小时才能弄完
+   CMS问题比较多，所以现在没有一个版本默认是CMS，只能手工指定。Concurrent的意思是正常程序和GC可以并发运行
    CMS既然是MarkSweep，就一定会有碎片化的问题，碎片到达一定程度，CMS的老年代分配对象分配不下的时候，使用SerialOld 进行老年代回收
    想象一下：
    PS + PO -> 加内存 换垃圾回收器 -> PN + CMS + SerialOld（几个小时 - 几天的STW）
@@ -102,7 +104,7 @@ new : old = 1 : 3
    算法：三色标记 + Incremental Update
 8. G1(10ms)
    算法：三色标记 + SATB
-9. ZGC (1ms) PK C++
+9. ZGC (1ms) PK C++， zero stw
    算法：ColoredPointers + LoadBarrier
 10. Shenandoah
     算法：ColoredPointers + WriteBarrier
