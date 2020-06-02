@@ -94,7 +94,7 @@ new : old = 1 : 3
 3. Parellel Scavenge 年轻代 多线程并行回收
 4. ParNew 年轻代 也是并行回收，为了配合CMS的并行回收而设计的
 5. SerialOld 
-6. ParallelOld 所谓的调优绝大多数都是跳的2、3、5、6，因为1.8默认的GC是PS + ParallelOld
+6. ParallelOld 所谓的调优绝大多数都是跳的2、3、5、6，因为1.8默认的GC是PS + ParallelOld (-XX:+UseParallelGC)
 7. ConcurrentMarkSweep 老年代 并发的， 垃圾回收和应用程序同时运行，降低STW的时间(200ms)，其他的GC可能需要几个小时才能弄完
    CMS问题比较多，所以现在没有一个版本默认是CMS，只能手工指定。Concurrent的意思是正常程序和GC可以并发运行
    CMS既然是MarkSweep，就一定会有碎片化的问题，碎片到达一定程度，CMS的老年代分配对象分配不下的时候，使用SerialOld 进行老年代回收
@@ -110,7 +110,8 @@ new : old = 1 : 3
     算法：ColoredPointers + WriteBarrier
 11. Eplison
 12. PS 和 PN区别的延伸阅读：
-    ▪[https://docs.oracle.com/en/java/javase/13/gctuning/ergonomics.html#GUID-3D0BB91E-9BFF-4EBB-B523-14493A860E73](https://docs.oracle.com/en/java/javase/13/gctuning/ergonomics.html)
+    ▪[https://docs.oracle.com/en/java/javase/13/gctuning/ergonomics.html#GUID-3D0BB91E-9BFF-4EBB-B523-14493A860E73]
+    (https://docs.oracle.com/en/java/javase/13/gctuning/ergonomics.html)
 13. 垃圾收集器跟内存大小的关系
     1. Serial 几十兆
     2. PS 上百兆 - 几个G
@@ -176,17 +177,19 @@ new : old = 1 : 3
   }
   ```
 
-  
+
 
   1. 区分概念：内存泄漏memory leak，内存溢出out of memory
   2. java -XX:+PrintCommandLineFlags HelloGC
   3. java -Xmn10M -Xms40M -Xmx60M -XX:+PrintCommandLineFlags -XX:+PrintGC  HelloGC
      PrintGCDetails PrintGCTimeStamps PrintGCCauses
-  4. java -XX:+UseConcMarkSweepGC -XX:+PrintCommandLineFlags HelloGC
-  5. java -XX:+PrintFlagsInitial 默认参数值
-  6. java -XX:+PrintFlagsFinal 最终参数值
-  7. java -XX:+PrintFlagsFinal | grep xxx 找到对应的参数
-  8. java -XX:+PrintFlagsFinal -version |grep GC
+  4. java -XX:+UseConcMarkSweepGC 
+  5. java -XX:+PrintCommandLineFlags HelloGC (拿到运行时传进去的那些启动的时候的命令行参数，无害，只是观察)
+  6. java -XX:+UseG1GC
+  7. java -XX:+PrintFlagsInitial 默认参数值
+  8. java -XX:+PrintFlagsFinal 最终参数值
+  9. java -XX:+PrintFlagsFinal | grep xxx 找到对应的参数
+  10. java -XX:+PrintFlagsFinal -version |grep GC
 
 ### PS GC日志详解
 
