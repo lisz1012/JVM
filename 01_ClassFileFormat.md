@@ -68,7 +68,10 @@ SourceFile: "T0100_ByteCode01.java"
 Class文件设计的特别紧凑，都没有分隔符，所以再设计编程语言的时候，只要编译成class文件就好。aload_0代表
 把本地变量表里的第0号放到栈里，局部变量表里的第0项，只要不是静态的，永远都是this，他会被扔到操作数栈里。
 invokespecial是调用this的构造方法。JVM汇编指令中只有8条是原子性的，连long l = 0L; 和
-double f = 0.0f;都不是原子性的，他是由ldc和putfield两条指令构成，完全有可能被打断
+double f = 0.0f;都不是原子性的，他是由ldc和putfield两条指令构成，完全有可能被打断. 加了volatile，
+对于long和double的读写就是原子性的了，这里说的原子性是赋值的时候原子性，每一条JVM汇编是不是原子性的。
+JVM的接口要求JVM的实现见到volatile修饰的long和double要实现原子性，原来是总线锁实现，现在是MESI实现。
+volatile long 在虚拟机底层会当成原子性来处理
 
 
 ## 3：类编译-加载-初始化
