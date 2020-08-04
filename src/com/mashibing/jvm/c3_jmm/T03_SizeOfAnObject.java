@@ -1,5 +1,5 @@
 package com.mashibing.jvm.c3_jmm;
-
+/*
 import com.mashibing.jvm.agent.ObjectSizeAgent;
 
 public class T03_SizeOfAnObject {
@@ -27,3 +27,4 @@ public class T03_SizeOfAnObject {
 
     }
 }
+ */
