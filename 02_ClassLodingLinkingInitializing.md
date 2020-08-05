@@ -5,8 +5,21 @@
    类被加载到内存之后，生成了两块内容：1。硬盘中的文件原封不动地写入内存的meta space。2。Class类的对象，指向这个在内存中的二进制文件。其他的对象就通过这个
    Class类的对象去访问这个内存中的Class文件。Class类的对象是Hotspot中 C++ 代码 load的过程之中给弄出来的，未必是调用了new关键字
    1. Loading
+      Bootstrap类加载器：加载lib/rt.jar charset.jar 等核心类，C++实现。Extension类加载器：加载扩展jar包：jre/lib/ext*.jar，或由 
+      -Djava.ext.dirs指定. App类加载器：加载classpath指定的内容。 CustomClassLoader自定义ClassLoader。这4个ClassLoader之间并不是继承关系
+      getClassLoader就是找到是谁把这个Class类的对象load进内存的，父ClassLoader先load子ClassLoader，然后子Classloader再去load别的类。
+      可以一直查找加载器的加载器是谁，加载器的加载器既不一定是他的父类，也不一定是他的parent属性指向的那个对象。一直找到BootstrapClassLoader之后，会返回
+      null，因为它是C++代码写的，Java里面没有一个Class和它对应。Bootstrap加载器是C++实现的一个模块  
       
-      1. 双亲委派，主要出于安全来考虑
+      加载过程：loadClass方法调用，假设一个Class文件，假如有自定义的CustomClassLoader，就先尝试找它，它里面有个小缓存，记录了已经load的Class，
+      如果已经加载，就返回，无需加载第二遍了，如果还没加载过，则并不是立即加载，而是找AppClassLoader，后者也去查他的缓存，一加载就返回，没加载就
+      找他的父加载器，直到 Bootstrap ClassLoader，如果他也没加载过，再查一下是不是Bootstrap ClassLoader的负责范围，如果是，则加载，不是在继续
+      把加载这件事交回给子加载器，最后转了一圈委托回来再由这个CustomClassLoader加载。如果最后加载成功了，则没问题；否则，抛出ClassNotFoundException。
+      以上过程就叫做"双亲委派"（这里翻译有点问题）
+      
+      1. 双亲委派，主要出于安全来考虑。加入任何一个自定义的CustomClassloader都可以把class文件load到内存的话，则可以load 自定义的一个java.lang.String，
+        这样就可以覆盖JDK的String类，再load到内存，再打包成一个类库交给客户。客户在输入密码的时候，应该会把密码存成一个String类型的对象，而这个String类
+        的对象里面可以写个发邮件的程序暴露其密码
       
       2. LazyLoading 五种情况
       
