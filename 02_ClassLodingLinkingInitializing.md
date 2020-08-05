@@ -17,10 +17,12 @@
       找他的父加载器，直到 Bootstrap ClassLoader，如果他也没加载过，再查一下是不是Bootstrap ClassLoader的负责范围，如果是，则加载，不是在继续
       把加载这件事交回给子加载器，最后转了一圈委托回来再由这个CustomClassLoader加载。如果最后加载成功了，则没问题；否则，抛出ClassNotFoundException。
       以上过程就叫做"双亲委派"（这里翻译有点问题）Classloader是反射的基石，反射就是借助于Class对象来访问Classloader load到内存中的二进制文件 什么时候会需要自己去加载？
+      Spring 动态代理的时候，生成的动态代理一个新的Class，用的时候实际上Spring已经load到内存里了。JReBel热部署。
       
       1. 双亲委派，*主要出于安全来考虑*。加入任何一个自定义的CustomClassloader都可以把class文件load到内存的话，则可以load 自定义的一个java.lang.String，
         这样就可以覆盖JDK的String类，再load到内存，再打包成一个类库交给客户。客户在输入密码的时候，应该会把密码存成一个String类型的对象，而这个String类
-        的对象里面可以写个发邮件的程序暴露其密码。次要问题是资源浪费
+        的对象里面可以写个发邮件的程序暴露其密码。次要问题是资源浪费。当转了一圈被委派回来的时候，会调用findClass方法，而在ClassLoader这个类里面，此方法是个protected的，
+        而且里面直接throw了ClassNotFoundException，可见这是个模版方法，自定义的子类要实现它。面试的时候举例模版方法的时候，可以用这个例子
       
       2. LazyLoading 五种情况
       
