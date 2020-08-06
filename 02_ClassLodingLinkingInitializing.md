@@ -12,8 +12,8 @@
       这个"父加载器"是工序层面上的，而不是extends的那个类）一直找到BootstrapClassLoader之后，会返回null，因为它是C++代码写的，Java里面没有一个Class和
       它对应。Bootstrap加载器是C++实现的一个模块  
       
-      加载过程：loadClass方法调用，假设一个Class文件，假如有自定义的CustomClassLoader，就先尝试找它，它里面有个小缓存，记录了已经load的Class，
-      如果已经加载，就返回，无需加载第二遍了，如果还没加载过，则并不是立即加载，而是找AppClassLoader，后者也去查他的缓存，已加载就返回，没加载就
+      加载过程：loadClass方法调用，假设一个Class文件，假如有自定义的CustomClassLoader，就先尝试找它（native方法：findLoadedClass0），它里面有个小缓存，记录了已经
+      load的Class，如果已经加载，就返回，无需加载第二遍了，如果还没加载过，则并不是立即加载，而是找AppClassLoader，后者也去查他的缓存，已加载就返回，没加载就
       找他的父加载器，直到 Bootstrap ClassLoader，如果他也没加载过，再查一下是不是Bootstrap ClassLoader的负责范围，如果是，则加载，如果不是再继续
       把加载这件事交回给子加载器，最后转了一圈委托回来再由这个CustomClassLoader加载。如果最后加载成功了，则没问题；否则，抛出ClassNotFoundException。
       以上过程就叫做"双亲委派"（这里翻译有点问题）Classloader是反射的基石，反射就是借助于Class对象来访问Classloader load到内存中的二进制文件 什么时候会需要自己去加载？
@@ -24,9 +24,9 @@
         的对象里面可以写个发邮件的程序暴露其密码。次要问题是资源浪费。当转了一圈被委派回来的时候，会调用findClass方法，而在ClassLoader这个类里面，此方法是个protected的，
         而且里面直接throw了ClassNotFoundException，可见这是个模版方法，自定义的子类要实现它。面试的时候举例模版方法的时候，可以用这个例子. 重写ClassLoader类的
         loadClass方法可以破坏双亲委派机制，有两次曾经就是被破坏了，但是是被JDK自己破坏的。Spring和tomcat都有自己的Classloader，这样就可以load自己指定目录（而不是classpath下面）
-        下的Class文件了
+        下的Class文件了。双亲委派就像一条责任链
       
-      2. LazyLoading （很繁琐，但是没人考这个）五种情况
+      2. LazyLoading （很繁琐，但是没人考这个，扩展着玩的，别深究）五种情况
       
          1. –new getstatic putstatic invokestatic指令，访问final变量除外
       
@@ -45,7 +45,7 @@
       4. 自定义类加载器
       
          1. extends ClassLoader
-         2. overwrite findClass() -> defineClass(byte[] -> Class clazz)
+         2. overwrite findClass() 里面应该会调用 -> defineClass(byte[] -> Class clazz)
          3. 加密
          4. <font color=red>第一节课遗留问题：parent是如何指定的，打破双亲委派，学生问题桌面图片</font>
             1. 用super(parent)指定
@@ -58,6 +58,10 @@
                      1. osgi tomcat 都有自己的模块指定classloader（可以加载同一类库的不同版本）
       
       5. 混合执行 编译执行 解释执行
+         Java是混合模式：混合使用解释器和热点编译（JIT）。起始阶段采用解释执行。热点代码检测：多次被调用的方法（方法计数器：检测方法执行频率）
+         多次被调用的循环（循环计数器：检测循环执行频率）进行编译。 参数：-Xmixed 默认为混合模式开始解释执行，启动速度比较快，对热点代码进行解释
+         和编译； -Xint 使用解释模式，启动很快执行稍慢；-Xcomp使用纯编译模式，执行很快启动很慢。编译和混合差不多，都很快，但是纯解释就很慢很慢
+         注：C语言编译玩的格式叫做本地（native）代码，Windows下是exe，Linux下是elf
       
          1. 检测热点代码：-XX:CompileThreshold = 10000
       
