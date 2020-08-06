@@ -13,8 +13,8 @@
       它对应。Bootstrap加载器是C++实现的一个模块  
       
       加载过程：loadClass方法调用，假设一个Class文件，假如有自定义的CustomClassLoader，就先尝试找它，它里面有个小缓存，记录了已经load的Class，
-      如果已经加载，就返回，无需加载第二遍了，如果还没加载过，则并不是立即加载，而是找AppClassLoader，后者也去查他的缓存，一加载就返回，没加载就
-      找他的父加载器，直到 Bootstrap ClassLoader，如果他也没加载过，再查一下是不是Bootstrap ClassLoader的负责范围，如果是，则加载，不是在继续
+      如果已经加载，就返回，无需加载第二遍了，如果还没加载过，则并不是立即加载，而是找AppClassLoader，后者也去查他的缓存，已加载就返回，没加载就
+      找他的父加载器，直到 Bootstrap ClassLoader，如果他也没加载过，再查一下是不是Bootstrap ClassLoader的负责范围，如果是，则加载，如果不是再继续
       把加载这件事交回给子加载器，最后转了一圈委托回来再由这个CustomClassLoader加载。如果最后加载成功了，则没问题；否则，抛出ClassNotFoundException。
       以上过程就叫做"双亲委派"（这里翻译有点问题）Classloader是反射的基石，反射就是借助于Class对象来访问Classloader load到内存中的二进制文件 什么时候会需要自己去加载？
       Spring 动态代理的时候，生成的动态代理一个新的Class，用的时候实际上Spring已经load到内存里了。JReBel热部署。
@@ -22,9 +22,11 @@
       1. 双亲委派，*主要出于安全来考虑*。加入任何一个自定义的CustomClassloader都可以把class文件load到内存的话，则可以load 自定义的一个java.lang.String，
         这样就可以覆盖JDK的String类，再load到内存，再打包成一个类库交给客户。客户在输入密码的时候，应该会把密码存成一个String类型的对象，而这个String类
         的对象里面可以写个发邮件的程序暴露其密码。次要问题是资源浪费。当转了一圈被委派回来的时候，会调用findClass方法，而在ClassLoader这个类里面，此方法是个protected的，
-        而且里面直接throw了ClassNotFoundException，可见这是个模版方法，自定义的子类要实现它。面试的时候举例模版方法的时候，可以用这个例子
+        而且里面直接throw了ClassNotFoundException，可见这是个模版方法，自定义的子类要实现它。面试的时候举例模版方法的时候，可以用这个例子. 重写ClassLoader类的
+        loadClass方法可以破坏双亲委派机制，有两次曾经就是被破坏了，但是是被JDK自己破坏的。Spring和tomcat都有自己的Classloader，这样就可以load自己指定目录（而不是classpath下面）
+        下的Class文件了
       
-      2. LazyLoading 五种情况
+      2. LazyLoading （很繁琐，但是没人考这个）五种情况
       
          1. –new getstatic putstatic invokestatic指令，访问final变量除外
       
