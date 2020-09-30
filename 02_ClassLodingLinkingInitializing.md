@@ -55,7 +55,9 @@
                   1. JDK1.2之前，自定义ClassLoader都必须重写loadClass()
                   2. ThreadContextClassLoader可以实现基础类调用实现类代码，通过thread.setContextClassLoader指定
                   3. 热启动，热部署
-                     1. osgi tomcat 都有自己的模块指定classloader（可以加载同一类库的不同版本）
+                     1. osgi tomcat 都有自己的模块指定classloader（可以加载同一类库的不同版本）.热部署（加载）的时候就不去检查
+                        原来是否加载过了，可以二话不说直接重新加载。期间ClassLoader也要new新的、换引用的指向，一个Class的ClassLoader
+                        被回收之后，他们在MetaSpace中也呆不长，也会被回收
       
       5. 混合执行 编译执行 解释执行
          Java是混合模式：混合使用解释器和热点编译（JIT）。起始阶段采用解释执行。热点代码检测：多次被调用的方法（方法计数器：检测方法执行频率）
@@ -72,7 +74,7 @@
          1. 静态成员变量赋默认值: static int i = 8; 在这里先赋值成0这个默认值，而不是8
       3. Resolution
          1. 将类、方法、属性等符号引用解析为直接引用
-            常量池中的各种符号引用解析为指针、偏移量等内存地址的直接引用
+            常量池中的各种符号引用解析为指针、偏移量等内存地址的直接引用: 很多事动态绑定，new出来之后才知道指向哪里
       
    3. Initializing
    
@@ -81,5 +83,5 @@
    
 2. 小总结：
 
-   1. load - 默认值 - 初始值
-   2. new - 申请内存 - 默认值 - 初始值
+   1. load -> 默认值（preparation） -> 初始值（Initializing）
+   2. new - 申请内存 -> 默认值 -> 初始值。其实是跟累的加载过程类似，这就解释了为什么不复制的成员变量默认是0，或者null
