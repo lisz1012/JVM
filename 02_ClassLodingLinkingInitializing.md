@@ -50,7 +50,7 @@
          4. <font color=red>第一节课遗留问题：parent是如何指定的，打破双亲委派，学生问题桌面图片</font>
             1. 用super(parent)指定
             2. 双亲委派的打破
-               1. 如何打破：重写loadClass（）
+               1. 如何打破：重写ClassLoader.loadClass(),因为它里面定义了先找自己有没有加载过这个Class然后再去parent成员递归地中找
                2. 何时打破过？
                   1. JDK1.2之前，自定义ClassLoader都必须重写loadClass()
                   2. ThreadContextClassLoader可以实现基础类调用实现类代码，通过thread.setContextClassLoader指定
