@@ -11,7 +11,7 @@ java -XX:+PrintCommandLineFlags -version
 ### 普通对象
 
 1. 对象头：markword  8
-2. ClassPointer指针：-XX:+UseCompressedClassPointers 为4字节 不开启为8字节
+2. ClassPointer指针：-XX:+UseCompressedClassPointers 为4字节 不开启为8字节，只想他是那个Class的对象（比如 Object.class）
 3. 实例数据
    1. 引用类型：-XX:+UseCompressedOops 为4字节 不开启为8字节 
       Oops Ordinary Object Pointers
@@ -21,15 +21,18 @@ java -XX:+PrintCommandLineFlags -version
 
 1. 对象头：markword 8
 2. ClassPointer指针同上
-3. 数组长度：4字节
+3. 数组长度：4字节 (为什么数组最大长度的上限是2^31?因为4个字节,32位所表示的最大的有符号整数的数值是2^31)
 4. 数组数据
 5. 对齐 8的倍数
+
+对象头这8个字节具体包括：上锁（无锁和偏向是01，轻量级锁是00，重量级锁是10，会调用内核）和GC（11）（对象被回收了多少次了、分代的年龄）
+不同的状态下，64位中不同的bit代表的意义不一样
 
 ## 实验
 
 1. 新建项目ObjectSize （1.8）
 
-2. 创建文件ObjectSizeAgent
+2. 创建文件ObjectSizeAgent（Agent可以在类被load到内存的时候截获她，然后获知她的大小）
 
    ```java
    package com.mashibing.jvm.agent;
@@ -114,6 +117,7 @@ java -XX:+PrintCommandLineFlags -version
 回答白马非马的问题：
 
 当一个对象计算过identityHashCode之后，不能进入偏向锁状态
+因为对象的hashcode会占据线程ID和Epoch的那几位的位置
 
 https://cloud.tencent.com/developer/article/1480590
  https://cloud.tencent.com/developer/article/1484167
@@ -126,5 +130,7 @@ https://cloud.tencent.com/developer/article/1482500
 
 •https://blog.csdn.net/clover_lily/article/details/80095580
 
-1. 句柄池
-2. 直接指针
+T t = new T();怎么通过t这个引用找到new出来的T对象的？有两种方式：
+
+1. 句柄池：t只想一个对象，对象里有两个指针，一个指向真实的对象，两一个指向它的Class对象 （GC算法效率高，三色算法）
+2. 直接指针：直接指向真实对象，然后通过其ClassPointer指向Class对象 （Hotspot用这一种，效率比较高）
