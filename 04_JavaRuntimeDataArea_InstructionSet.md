@@ -40,7 +40,7 @@ JVM Stack
       看看他有没有解析，如果还没有就进行动态解析，如果已经解析了就直接拿过来用，非动态解析应该是Resolution那一步做的事情。比如：
       A方法调用了B方法，找B的时候就去常量池里面找，这个link就叫Dynamic Linking
    4. return address
-      a() -> b()，方法a调用了方法b, b方法的返回值放在什么地方（a方法栈的栈顶），以及b执行完了之后应该回到那里继续执行。
+      a() -> b()，方法a调用了方法b, b方法的返回值放在什么地方（a方法栈的栈顶，ireturn），以及b执行完了之后应该回到那里继续执行。
 
 TestPlusPlus.java 的执行：先提一下，这里main方法的局部变量有两个，下标为0的是args，下标为1的是i
 代码：
@@ -167,7 +167,7 @@ invoke
 
 1. InvokeStatic
 2. InvokeVirtual
-3. InvokeInterface
+3. InvokeInterface 调用接口方法
 4. InovkeSpecial
    可以直接定位，不需要多态的方法
    private 方法 ， 构造方法
