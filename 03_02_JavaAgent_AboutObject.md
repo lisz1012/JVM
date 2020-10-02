@@ -10,7 +10,7 @@ java -XX:+PrintCommandLineFlags -version
 
 ### 普通对象
 
-1. 对象头：markword  8
+1. 对象头：markword  8个字节（64位机器） 
 2. ClassPointer指针：-XX:+UseCompressedClassPointers 为4字节 不开启为8字节，只想他是那个Class的对象（比如 Object.class）
 3. 实例数据
    1. 引用类型：-XX:+UseCompressedOops 为4字节 不开启为8字节 
@@ -19,7 +19,7 @@ java -XX:+PrintCommandLineFlags -version
 
 ### 数组对象
 
-1. 对象头：markword 8
+1. 对象头：markword 8个字节（64位机器） 
 2. ClassPointer指针同上
 3. 数组长度：4字节 (为什么数组最大长度的上限是2^31?因为4个字节,32位所表示的最大的有符号整数的数值是2^31)
 4. 数组数据
