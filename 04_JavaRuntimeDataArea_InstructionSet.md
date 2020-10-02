@@ -28,8 +28,8 @@ PC 程序计数器
 
 JVM Stack
 
-1. Frame - 整个JVM 的线程stack包括一个个的栈帧，每个方法对应一个栈帧，每个栈帧都有自己的一个操作数栈和Dynamic linking
-   1. Local Variable Table 参数也是局部变量，栈帧一弹出就没了，这就是为什么除了这个大括号就没人人是局部变量了。
+1. Frame - 整个JVM 的线程stack包括一个个的栈帧(在主存里)，每个方法对应一个栈帧，每个栈帧都有自己的一个操作数栈和Dynamic linking
+   1. Local Variable Table 参数也是局部变量，栈帧一弹出就没了，这就是为什么除了这个大括号就没人认识局部变量了。
    2. Operand Stack，也就是说，栈帧里面有一个小栈
       对于long的处理（store and load），多数虚拟机的实现都是原子的
       jls 17.7，没必要加volatile
@@ -42,14 +42,14 @@ JVM Stack
    4. return address
       a() -> b()，方法a调用了方法b, b方法的返回值放在什么地方（a方法栈的栈顶），以及b执行完了之后应该回到那里继续执行。
 
-TestPlusPlus.java 的执行：先提一下，这里局部变量有两个下标为0的是args，下标为1的是i
+TestPlusPlus.java 的执行：先提一下，这里main方法的局部变量有两个，下标为0的是args，下标为1的是i
 代码：
-```java
+```
 public static void main(String[] args) {
-        int i = 8;
-        i = i++;
-        System.out.println(i);
-    }
+    int i = 8;
+    i = i++;
+    System.out.println(i);
+}
 ```
 故事的情节是这样的：
 ```
@@ -66,10 +66,10 @@ public static void main(String[] args) {
 换成++i：
 ```
 public static void main(String[] args) {
-        int i = 8;
-        i = ++i;
-        System.out.println(i);
-    }
+    int i = 8;
+    i = ++i;
+    System.out.println(i);
+}
 ```
 编译之后：
 ```
@@ -88,13 +88,43 @@ public static void main(String[] args) {
 2 基于寄存器的指令集。相对复杂，但是速度快  
 Hotspot的local variable那张表，就非常类似于寄存器。虚拟机无论怎么设计，到了硬件层面都是基于寄存器的
 
+```
+public static void main(String[] args) {
+    Hello_02 h = new Hello_02();
+    h.m1();
+}
+```
+编译之后：
+```
+ 0 new #2 <com/mashibing/jvm/c4_RuntimeDataAreaAndInstructionSet/Hello_02>   new的时候只是赋默认值，而且对象的地址会压栈
+ 3 dup  把栈顶（刚new出来的对象的地址）复制一份变为新的栈顶，也就是说有两个指针指向这个对象了，但是各属性的值还是默认值
+ 4 invokespecial #3 <com/mashibing/jvm/c4_RuntimeDataAreaAndInstructionSet/Hello_02.<init>>  执行构造方法，这时候会把最上面那个复制出来的地址给弹出去，告诉到底是哪个对象执行构造，然后初始值都赋值完成了
+ 7 astore_1  把创建好的对象赋值给h（局部变量表里面下标为1的，而下标为0的是args），允许指令重排序的话，可能在底层先赋值给h，再做init中的事情
+ 8 aload_1   再把局部表量表里下标为1的压栈，h就入栈了，因为invokevirtual需要有个对象，对其调用方法m1
+ 9 invokevirtual #4 <com/mashibing/jvm/c4_RuntimeDataAreaAndInstructionSet/Hello_02.m1>   #4指向的是m1方法 Invoke instance method; dispatch based on class，动态绑定
+12 return
+```
+iconst_1 是把常量1压栈  
+if_icmpne 是弹出两个操作数比较不等之后跳到哪一行代码去继续执行
+ireturn 是把被调用方法栈顶的数字pop出来并且push到invoker的栈顶  
+aload_0 是把this入栈
+invokevirtual 大多数非静态非私有方法调用。会把栈上的this弹出去，实现多态的执行，所以这条语句执行之前一定要保证有一个方法所属对象的引用已经在栈上了
+invokespecial 可以调用构造或者private的方法，可以直接定位不需要多态的方法  
+invokeDynamic 是在用lambda表达式、反射的时候用到的，支持动态语言、动态产生的class，每有一个lambda就多一个内部类的Class对象
+
+<clinit> 是静态方法块    
+<init> 构造方法  
+_store 弹栈并赋值到某个局部变量表里的变量  
+_load 把局部变量表里的某个变量压栈，跟上面的指令是逆操作
+invoke_XXX 
+
 Heap
 
 Method Area 有以下两个实现：
 
 1. Perm Space (<1.8)
    字符串常量位于PermSpace
-   FGC不会清理
+   FGC不会清理，直接溢出
    大小启动的时候指定，不能变
 2. Meta Space (>=1.8)
    字符串常量位于堆
