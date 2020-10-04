@@ -50,9 +50,14 @@
    2. 永久代必须指定大小限制 ，元数据可以设置，也可以不设置，无上限（受限于物理内存）。如果有限制，spring动态代理的时候会生成好多Class文件，到时候会有永久带的内存溢出
    3. 字符串常量 1.7 - 永久代，1.8 - 堆（**并不是在元数据区**）
    4. MethodArea逻辑概念 - 永久代（1.7）、元数据(1.8)，并不是一个物理上的分区
-永久带和元数据区：永久代在对立面，但是元数据区就不受JVM的管理了，而是被OS管理
+永久带和元数据区：永久代在对立面，但是元数据区就不受JVM的管理了，而是被OS管理  
+   对象分配（不重要）：
+    1. 首先试图栈上分配，这个概念是Java对标C语言的struct可以在栈上分配的功能而推出的。好处是不用麻烦垃圾收集器
+    2. 然后是线程本地分配（Thread Local Allocation Buffer）很多线程争着往eden区域里申请内存new对象，这样会产生争用，要进行同步。现在
+       给每个线程默认1%的eden空间。这个适合小对象
    
-3. 新生代 = Eden + 2个suvivor区 
+   
+3. 新生代 = Eden + 2个suvivor区 (Eden : s1 : s2 = 8 : 1 : 1)
    1. YGC（Young GC）回收之后，大多数的对象会被回收，活着的进入s0
    2. 再次YGC，活着的对象eden + s0 -> s1
    3. 再次YGC，eden + s1 -> s0
@@ -66,7 +71,7 @@
    2. 老年代满了FGC Full GC
 
 eden : suvivor0 : suvivor1 = 8 : 1 : 1
-new : old = 1 : 3
+new : old = 1 : 2 (Java 1.8)
 这个比例的底层原因是：确信eden去里面绝大多数的对象会被一次GC回收掉
    
 5. GC Tuning (Generation)
@@ -89,20 +94,29 @@ new : old = 1 : 3
 ![常用垃圾回收器](常用垃圾回收器.png)
 
 1. JDK诞生 Serial追随 提高效率，诞生了PS，为了配合CMS，诞生了PN，CMS是1.4版本后期引入，CMS是里程碑式的GC，它开启了并发回收的过程，但是CMS毛病较多，因此目前任何一个JDK版本默认是CMS
-   并发垃圾回收是因为无法忍受STW
+   并发垃圾回收是因为无法忍受STW.所谓的Serial指的是单线程，parallel指的是多线程
 2. Serial 年轻代 串行回收 a stop-the-world(停下所有的用户线程，垃圾回收线程上场，回收完了之后，程序继续运行), copying collector which uses a single GC thread
 3. Parellel Scavenge 年轻代 多线程并行回收
-4. ParNew 年轻代 也是并行回收，为了配合CMS的并行回收而设计的
+4. ParNew（PN）， 就是Parellel Scavenge的新版本（目前还没有不会产生STW的垃圾回收器，ZGC能达到2ms的STW），年轻代 也是并行回收，
+   为了配合CMS的并行回收而设计的
 5. SerialOld 
-6. ParallelOld 所谓的调优绝大多数都是跳的2、3、5、6，因为1.8默认的GC是PS + ParallelOld (-XX:+UseParallelGC)
-7. ConcurrentMarkSweep 老年代 并发的， 垃圾回收和应用程序同时运行，降低STW的时间(200ms)，其他的GC可能需要几个小时才能弄完
-   CMS问题比较多，所以现在没有一个版本默认是CMS，只能手工指定。Concurrent的意思是正常程序和GC可以并发运行
-   CMS既然是MarkSweep，就一定会有碎片化的问题，碎片到达一定程度，CMS的老年代分配对象分配不下的时候，使用SerialOld 进行老年代回收
+6. ParallelOld 所谓的调优绝大多数都是跳的2、3、5、6，因为1.8默认的GC是PS + ParallelOld (-XX:+UseParallelGC) 重点关注这一种
+7. ConcurrentMarkSweep 针对老年代（FGC的时候） 并发的，老年代装不下了会触发CMS。垃圾回收和应用程序同时运行，降低STW的时间(200ms)，其他的GC可能需要几个
+   小时才能弄完。CMS问题比较多，所以现在没有一个版本默认是CMS，只能手工指定。Concurrent的意思是正常程序和GC可以并发运行。  
+   1. 初始标记： 标识最根上的对象，STW，但是时间比较短，根上的的垃圾比较少（好像是单线程）
+   2. 并发标记： 80%GC时间都是浪费在这里的，现在它跟工作线程一起进行，不STW，客户可能感觉慢了点，但程序还有反应
+   3. 重新标记： 并发标记标记的不全，在其间会产生新的垃圾，所以要再来一遍，会有STW，但是很短暂（好像是多线程）
+   4. 并发清理： 期间也会产生新垃圾，就是浮动垃圾，等下一次GC清理掉
+      
+   *CMS的问题：*CMS既然是MarkSweep，就一定会有碎片化的问题，碎片到达一定程度，CMS的老年代分配对象分配不下的时候，使用SerialOld
+   进行老年代回收，标记压缩. 拿CMS处理32G以上的大内存的时候基本上都会出问题。内存日志里出现Concurrent Mode Failure或者
+   PromotionFailed的时候基本上就是因为内存碎片太多了。解决方式是降低-XX:CMSInitiatingOccupancyFraction,从92%降低到68%，让老年去有
+   足够的预留空间，不至于请出SerialOld
    想象一下：
-   PS + PO -> 加内存 换垃圾回收器 -> PN + CMS + SerialOld（几个小时 - 几天的STW）
+   PS + PO -> 加内存 换垃圾回收器 -> PN + CMS + SerialOld（几个小时 - 几天的STW，这与CMS的设计初衷相悖）
    几十个G的内存，单线程回收 -> G1 + FGC 几十个G -> 上T内存的服务器 ZGC
    算法：三色标记 + Incremental Update
-8. G1(10ms)
+8. G1(10ms，1.7之后，1.8成熟)
    算法：三色标记 + SATB
 9. ZGC (1ms) PK C++， zero stw
    算法：ColoredPointers + LoadBarrier
