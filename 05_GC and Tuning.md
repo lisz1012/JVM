@@ -414,20 +414,21 @@ PS：重启有时候很直接很管用。TB历年来最高的并发：54W tps。
 2. java -Xms200M -Xmx200M -XX:+PrintGC com.mashibing.jvm.gc.T15_FullGC_Problem01
 
 3. 一般是运维团队首先受到报警信息（CPU Memory）
+   网管会用网管软件如Ansible，每台机器如果CPU、内存级别有问题就会报警
 
-4. top命令观察到问题：内存不断增长 CPU占用率居高不下
+4. top命令观察到问题：内存不断增长 CPU占用率居高不下，查看是哪个进程造成的
 
-5. top -Hp 观察进程中的线程，哪个线程CPU和内存占比高
+5. top -Hp 进程号 观察进程中的线程，哪个线程CPU和内存占比高
 
 6. jps定位具体java进程
    jstack 定位线程状况，重点关注：WAITING BLOCKED
-   eg.
+   eg. WAITING (on object monitor)
    waiting on <0x0000000088ca3310> (a java.lang.Object)
    假如有一个进程中100个线程，很多线程都在waiting on <xx> ，一定要找到是哪个线程持有这把锁
-   怎么找？搜索jstack dump的信息，找<xx> ，看哪个线程持有这把锁RUNNABLE
+   怎么找？搜索jstack dump的信息，找<0x0000000088ca3310> ，看哪个线程持有这把锁RUNNABLE
    作业：1：写一个死锁程序，用jstack观察 2 ：写一个程序，一个线程持有锁不释放，其他线程等待
 
-7. 为什么阿里规范里规定，线程的名称（尤其是线程池）都要写有意义的名称
+7. 为什么阿里规范里规定，线程的名称（尤其是线程池）都要写有意义的名称? 出了问题好定位
    怎么样自定义线程池里的线程名称？（自定义ThreadFactory）
 
 8. jinfo pid 
@@ -440,12 +441,13 @@ PS：重启有时候很直接很管用。TB历年来最高的并发：54W tps。
 
 10. jmap - histo 4655 | head -20，查找有多少对象产生
 
-11. jmap -dump:format=b,file=xxx pid ：
+11. jmap -dump:format=b,file=xxx pid ：（在线dump转储文件）
 
-    线上系统，内存特别大，jmap执行期间会对进程产生很大影响，甚至卡顿（电商不适合）
-    1：设定了参数HeapDump，OOM的时候会自动产生堆转储文件
-    2：<font color='red'>很多服务器备份（高可用），停掉这台服务器对其他服务器不影响</font>
-    3：在线定位(一般小点儿公司用不到)
+    线上系统，内存特别大，jmap（命令11）执行期间会对进程产生很大影响，甚至卡顿（电商不适合）咋办？
+    1：设定了参数HeapDump（HeapDumpOnOutOfMemoryError），OOM的时候会自动产生堆转储文件
+    2：<font color='red'>很多服务器备份（高可用），停掉这台服务器对其他服务器不影响</font> 这种比较通用吧，隔离之后再用jmap导出
+    3：在线定位(arthas，一般小点儿公司用不到)
+    数据库连接没释放掉也可能引起问题（连接数据库超时），这要看数据库连接池的日志，与JVM内存没有太大关系，这会儿早就抛异常了
 
 12. java -Xms20M -Xmx20M -XX:+UseParallelGC -XX:+HeapDumpOnOutOfMemoryError com.mashibing.jvm.gc.T15_FullGC_Problem01
 
@@ -456,7 +458,8 @@ jhat -J-mx512M xxx.dump
     拉到最后：找到对应链接
     可以使用OQL查找特定问题对象
     
-14. 找到代码的问题
+14. 找到代码的问题，过程是这样：1.运维团队上报问题 2.top/jps查看那个进程CPU利用率高 3.jstack看看是不是思索，或者那个线程有问题
+    4.如果是频繁GC，如果飚高的是垃圾回收线程，jmap看哪个对象instance和占用内存多
 
 #### jconsole远程连接
 
@@ -465,6 +468,9 @@ jhat -J-mx512M xxx.dump
    > ```shell
    > java -Djava.rmi.server.hostname=192.168.17.11 -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=11111 -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false XXX
    > ```
+
+这里要打开JMX，远程监控，java有个标准的访问远程服务的协议叫JMX，java要开启服务和端口让远程能访问到才可以。有些生产环境的Tomcat是打开的。
+但是JMX打开的话，对于服务器的性能还是挺有影响的，所以一般不会这么干。
 
 2. 如果遭遇 Local host name unknown：XXX的错误，修改/etc/hosts文件，把XXX加入进去
 
@@ -485,6 +491,7 @@ jhat -J-mx512M xxx.dump
 #### jvisualvm远程连接
 
  https://www.cnblogs.com/liugh/p/7620336.html （简单做法）
+ 登录host、选择JVM、选择抽样器(Sampler),点击 "Memory"
 
 #### jprofiler (收费)
 
