@@ -447,7 +447,8 @@ PS：重启有时候很直接很管用。TB历年来最高的并发：54W tps。
     1：设定了参数HeapDump（HeapDumpOnOutOfMemoryError），OOM的时候会自动产生堆转储文件
     2：<font color='red'>很多服务器备份（高可用），停掉这台服务器对其他服务器不影响</font> 这种比较通用吧，隔离之后再用jmap导出
     3：在线定位(arthas，一般小点儿公司用不到)
-    数据库连接没释放掉也可能引起问题（连接数据库超时），这要看数据库连接池的日志，与JVM内存没有太大关系，这会儿早就抛异常了
+    数据库连接没释放掉也可能引起问题（连接数据库超时），这要看数据库连接池的日志，与JVM内存没有太大关系，这会儿早就抛异常了。  
+    还有很多问题是由第三方类库产生的，改起来费劲
 
 12. java -Xms20M -Xmx20M -XX:+UseParallelGC -XX:+HeapDumpOnOutOfMemoryError com.mashibing.jvm.gc.T15_FullGC_Problem01
 
@@ -499,17 +500,19 @@ jhat -J-mx512M xxx.dump
 
 * 为什么需要在线排查？
    在生产上我们经常会碰到一些不好排查的问题，例如线程安全问题，用最简单的threaddump或者heapdump不好查到问题原因。为了排查这些问题，有时我们会临时加一些日志，比如在一些关键的函数里打印出入参，然后重新打包发布，如果打了日志还是没找到问题，继续加日志，重新打包发布。对于上线流程复杂而且审核比较严的公司，从改代码到上线需要层层的流转，会大大影响问题排查的进度。 
-* jvm观察jvm信息
+* arthas命令行下输入：jvm观察jvm信息
 * thread定位线程问题
 * dashboard 观察系统情况
-* heapdump + jhat分析
+* heapdump + jhat分析: 
+  直接输入heapdump，或者`heapdump 文件名` 会对主进程有影响 `jhat -J-mx512M XXX.hprof`, 指定个参数，一点点地导
+   最后可以用浏览器通过7000端口访问,期望也最下端可以看histogram和执行OQL （`select s from java.lang.String s where s.value.length >= 100`)
 * jad反编译
    动态代理生成类的问题定位
    第三方的类（观察代码）
    版本问题（确定自己最新提交的版本是不是被使用）
 * redefine 热替换
-   目前有些限制条件：只能改方法实现（方法已经运行完成），不能改方法名， 不能改属性
-   m() -> mm()
+   目前有些限制条件：只能改方法实现（方法已经运行完成），不能改方法名， 不能改属性. 用了ClassLoader里面的redefine方法
+   m() -> mm()现在还不行
 * sc  - search class
 * watch  - watch method
 * 没有包含的功能：jmap
