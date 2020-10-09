@@ -662,7 +662,11 @@ OOM产生的原因多种多样，有些程序未必产生OOM，不断FGC(CPU飙�
 4. tomcat http-header-size过大问题（Hector）
 
 5. lambda表达式导致方法区溢出问题(MethodArea / Perm Metaspace)
+   对于lambda表达式 `I i = C::n;` 每一个 i 都会产生一个 Class，而Class对象被分配在元空间，如果不断循环执行这一句，则会方法区溢出  
    LambdaGC.java     -XX:MaxMetaspaceSize=9M -XX:+PrintGCDetails
+   一旦出现 `Compressed class space` 就说明方法区溢出了, 方法区在方法没结束的时候不会被清理（有的GC不清理，有的清理条件比较苛刻），
+   实际很少发生，Class没有对应的对象了Class可能会被回收。JVM各个部分都会有溢出
+   
 
    ```java
    "C:\Program Files\Java\jdk1.8.0_181\bin\java.exe" -XX:MaxMetaspaceSize=9M -XX:+PrintGCDetails "-javaagent:C:\Program Files\JetBrains\IntelliJ IDEA Community Edition 2019.1\lib\idea_rt.jar=49316:C:\Program Files\JetBrains\IntelliJ IDEA Community Edition 2019.1\bin" -Dfile.encoding=UTF-8 -classpath "C:\Program Files\Java\jdk1.8.0_181\jre\lib\charsets.jar;C:\Program Files\Java\jdk1.8.0_181\jre\lib\deploy.jar;C:\Program Files\Java\jdk1.8.0_181\jre\lib\ext\access-bridge-64.jar;C:\Program Files\Java\jdk1.8.0_181\jre\lib\ext\cldrdata.jar;C:\Program Files\Java\jdk1.8.0_181\jre\lib\ext\dnsns.jar;C:\Program Files\Java\jdk1.8.0_181\jre\lib\ext\jaccess.jar;C:\Program Files\Java\jdk1.8.0_181\jre\lib\ext\jfxrt.jar;C:\Program Files\Java\jdk1.8.0_181\jre\lib\ext\localedata.jar;C:\Program Files\Java\jdk1.8.0_181\jre\lib\ext\nashorn.jar;C:\Program Files\Java\jdk1.8.0_181\jre\lib\ext\sunec.jar;C:\Program Files\Java\jdk1.8.0_181\jre\lib\ext\sunjce_provider.jar;C:\Program Files\Java\jdk1.8.0_181\jre\lib\ext\sunmscapi.jar;C:\Program Files\Java\jdk1.8.0_181\jre\lib\ext\sunpkcs11.jar;C:\Program Files\Java\jdk1.8.0_181\jre\lib\ext\zipfs.jar;C:\Program Files\Java\jdk1.8.0_181\jre\lib\javaws.jar;C:\Program Files\Java\jdk1.8.0_181\jre\lib\jce.jar;C:\Program Files\Java\jdk1.8.0_181\jre\lib\jfr.jar;C:\Program Files\Java\jdk1.8.0_181\jre\lib\jfxswt.jar;C:\Program Files\Java\jdk1.8.0_181\jre\lib\jsse.jar;C:\Program Files\Java\jdk1.8.0_181\jre\lib\management-agent.jar;C:\Program Files\Java\jdk1.8.0_181\jre\lib\plugin.jar;C:\Program Files\Java\jdk1.8.0_181\jre\lib\resources.jar;C:\Program Files\Java\jdk1.8.0_181\jre\lib\rt.jar;C:\work\ijprojects\JVM\out\production\JVM;C:\work\ijprojects\ObjectSize\out\artifacts\ObjectSize_jar\ObjectSize.jar" com.mashibing.jvm.gc.LambdaGC
@@ -713,7 +717,7 @@ OOM产生的原因多种多样，有些程序未必产生OOM，不断FGC(CPU飙�
    《深入理解Java虚拟机》P59，使用Unsafe分配直接内存，或者使用NIO的问题
 
 7. 栈溢出问题
-   -Xss设定太小
+   -Xss设定太小、无限递归。一个方法在被调用的时候就会产生一个栈帧，在没有退出的情况下再被调用，又会有一个栈帧
 
 8. 比较一下这两段程序的异同，分析哪一个是更优的写法：
 
@@ -730,14 +734,16 @@ OOM产生的原因多种多样，有些程序未必产生OOM，不断FGC(CPU飙�
        Object o = new Object();
    }
    ```
+   当然是第一种写法，第二种每进行一次循环就产生一个o，循环不结束会一直有对象产生不会被回收，并且栈上还有个引用指向他
 
 9. 重写finalize引发频繁GC
-   小米云，HBase同步系统，系统通过nginx访问超时报警，最后排查，C++程序员重写finalize引发频繁GC问题
-为什么C++程序员会重写finalize？（new delete）
-   finalize耗时比较长（200ms）
+   小米云，HBase同步系统，系统通过nginx访问超时报警（是由于CPU飙高），最后排查，C++程序员重写finalize引发频繁GC问题
+为什么C++程序员会重写finalize？（new delete）因为C++要手动回收，所以C++程序员在写类的时候顺手写了finalize，把它当成析构函数用了。
+finalize耗时比较长（200ms），好多对象积压，YGC回收不过来就会频繁FGC
+   
    
 10. 如果有一个系统，内存一直消耗不超过10%，但是观察GC日志，发现FGC总是频繁产生，会是什么引起的？
-    System.gc() (这个比较Low)
+    有人显式调用了 `System.gc()` (这个比较Low)
 
 11. Distuptor有个可以设置链的长度，如果过大，然后对象大，消费完不主动释放，会溢出 (来自 死物风情)
 
@@ -745,7 +751,7 @@ OOM产生的原因多种多样，有些程序未必产生OOM，不断FGC(CPU飙�
 
 13. new 大量线程，会产生 native thread OOM，（low）应该用线程池，
     解决方案：减少堆空间（太TMlow了）,预留更多内存产生native thread
-    JVM内存占物理内存比例 50% - 80%
+    JVM内存占物理内存比例 50% - 80%，差不多20%给native thread
 
 
 ### GC常用参数
